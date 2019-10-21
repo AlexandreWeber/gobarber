@@ -20,6 +20,23 @@ class UserController {
       provider
     });
   }
+
+  async index({ res }) {
+    const users = await User.findAll();
+
+    return res.json(users);
+  }
+
+  async show(req, res) {
+    const { id } = req.params;
+    const user = await User.findOne({ where: { id } });
+
+    if (user) {
+      return res.json(user);
+    }
+
+    return res.status(404).json({ error: 'Usuário não encontrado' });
+  }
 }
 
 export default new UserController();
