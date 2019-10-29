@@ -1,8 +1,10 @@
 import * as Yup from 'yup';
-import { startOfHour, parseISO, isBefore } from 'date-fns';
+import { startOfHour, parseISO, isBefore, format, subHours } from 'date-fns';
+import pt from 'date-fns/locale/pt';
 import Appointment from '../model/Appointment';
 import User from '../model/User';
 import File from '../model/File';
+import Notification from '../schemas/Notification';
 
 class AppointmentController {
   async store(req, res) {
@@ -28,6 +30,12 @@ class AppointmentController {
         .json({ error: 'Código do prestador de serviço inválido' });
     }
 
+    if (provider_id === req.userId0) {
+      return res.error(401).json({
+        error: 'O usuário não pode agendar um serviço para ele mesmo'
+      });
+    }
+
     // Verifica a data informada
     const hourStart = startOfHour(parseISO(date));
 
@@ -49,6 +57,19 @@ class AppointmentController {
       user_id: req.userId,
       provider_id,
       date: hourStart
+    });
+
+    // Notificar prestador de serviço
+    const user = await User.findByPk(req.userId);
+    const formattedDate = format(
+      hourStart,
+      "'dia' dd 'de' MMMM', às' H:mm'h'",
+      { locale: pt }
+    );
+
+    await Notification.create({
+      content: `Novo agendamento de ${user.name} para o ${formattedDate}`,
+      user: provider_id
     });
 
     return res.json(appointment);
@@ -83,6 +104,30 @@ class AppointmentController {
     });
 
     return res.json(appointments);
+  }
+
+  async delete(req, res) {
+    const appointment = await Appointment.findByPk(req.params.id);
+
+    if (appointment.user_id !== req.userId) {
+      return res
+        .status(401)
+        .json({ error: 'Sem permissão para cancelar esse agendamento' });
+    }
+
+    const dateWithSub = subHours(appointment.date, 2);
+
+    if (isBefore(dateWithSub, new Date())) {
+      return res
+        .status(401)
+        .json({ erro: 'Limite de 2 horas de cancelamento' });
+    }
+
+    appointment.canceled_at = new Date();
+
+    await appointment.save();
+
+    return res.json(appointment);
   }
 }
 
