@@ -1,5 +1,4 @@
 import { Model, Sequelize } from 'sequelize';
-import enviroment from '../../config/enviroment';
 
 class File extends Model {
   static init(sequelize) {
@@ -10,8 +9,7 @@ class File extends Model {
         url: {
           type: Sequelize.VIRTUAL,
           get() {
-            const { protocol, server, port } = enviroment;
-            return `${protocol}://${server}:${port}/files/${this.path}`;
+            return `${process.env.APP_URL}/files/${this.path}`;
           }
         }
       },
