@@ -5,7 +5,8 @@ import Appointment from '../model/Appointment';
 import User from '../model/User';
 import File from '../model/File';
 import Notification from '../schemas/Notification';
-import mail from '../../lib/Mail';
+import Queue from '../../lib/Queue';
+import CancellationMail from '../jobs/CancellationMail';
 
 class AppointmentController {
   async store(req, res) {
@@ -84,7 +85,7 @@ class AppointmentController {
         user_id: req.userId,
         canceled_at: null
       },
-      attributes: ['id', 'date'],
+      attributes: ['id', 'date', 'past', 'cancelable'],
       order: ['date'],
       limit: 20,
       offset: (page - 1) * 20,
@@ -132,27 +133,17 @@ class AppointmentController {
     const dateWithSub = subHours(appointment.date, 2);
 
     if (isBefore(dateWithSub, new Date())) {
-      return res
-        .status(401)
-        .json({ erro: 'Limite de 2 horas de cancelamento' });
+      return res.status(401).json({
+        erro:
+          'Você deve cancelar um agendamento com no mínimo 2 horas de antecedência'
+      });
     }
 
     appointment.canceled_at = new Date();
 
     await appointment.save();
 
-    await mail.sendMail({
-      to: `${appointment.provider.name} <${appointment.provider.email}>`,
-      subject: 'Agendamento cancelado',
-      template: 'cancellation',
-      context: {
-        provider: appointment.provider.name,
-        user: appointment.user.name,
-        date: format(appointment.date, "dd 'de' MMMM', às' H:mm'h'", {
-          locale: pt
-        })
-      }
-    });
+    await Queue.add(CancellationMail.key, { appointment });
 
     return res.json(appointment);
   }
