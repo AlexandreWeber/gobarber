@@ -23,7 +23,6 @@ class Database {
 
   mongo() {
     // eslint-disable-next-line no-unused-vars
-    console.log(process.env.MONGO_URL);
     const mongoConnection = mongoose.connect(process.env.MONGO_URL, {
       useNewUrlParser: true,
       useFindAndModify: true,
